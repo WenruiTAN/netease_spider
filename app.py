@@ -1,10 +1,18 @@
 import streamlit as st
+import os
+import subprocess
+
+# 在程序最开始执行，确保只执行一次
+if 'browser_installed' not in st.session_state:
+    with st.spinner("正在初始化服务器环境，请稍候..."):
+        # 尝试安装 playwright 浏览器内核
+        subprocess.run(["playwright", "install", "chromium"], check=True)
+        st.session_state['browser_installed'] = True
+
+# 然后才是你的其他 import
 import pandas as pd
 import asyncio
 from playwright.async_api import async_playwright
-import io
-import os
-import subprocess
 
 # --- 核心补丁：自动安装浏览器内核 ---
 def install_playwright_browsers():
