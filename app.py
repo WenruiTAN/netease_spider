@@ -4,94 +4,105 @@ import requests
 import io
 import re
 
-st.set_page_config(page_title="网易云数据助手", layout="wide")
-st.title("🎵 网易云音乐数据采集工具")
+st.set_page_config(page_title="网易云音乐数据采集", layout="wide")
 
-def get_data_v2(artist_id):
-    # 使用基础的移动端浏览器 Header
+st.title("🎵 网易云音乐歌手数据采集工具")
+
+def get_full_stats(artist_id):
     headers = {
-        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1',
-        'Referer': 'https://music.163.com/m/'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Referer': 'https://music.163.com/'
     }
     
     try:
-        # 1. 采集歌手基本信息
-        # 这个接口是目前最稳定的，可以穿透大部分云端 IP 屏蔽
-        info_url = f"https://music.163.com/api/artist/head/info/get?id={artist_id}"
+        # --- 1. 获取歌手基本信息（精准歌手名 + 粉丝数） ---
+        # 使用 artist 详情接口
+        info_url = f"https://music.163.com/api/v1/artist/{artist_id}"
         info_res = requests.get(info_url, headers=headers, timeout=10).json()
         
         if info_res.get('code') != 200:
-            return None, None, f"接口返回异常 (Code: {info_res.get('code')})"
+            return None, "无法获取歌手信息，请检查 ID 是否正确。"
             
-        artist_data = info_res.get('data', {})
-        name = artist_data.get('name', '未知歌手')
-        # 抓取粉丝数 (fansCount)
-        fans = artist_data.get('fansCount', '暂无数据')
-
-        # 2. 获取热门歌曲列表
+        artist_obj = info_res.get('artist', {})
+        artist_name = artist_obj.get('name', '未知歌手')
+        # 粉丝数在部分接口中可能为 null，尝试多路径获取
+        fans_count = artist_obj.get('fansCount') or "需网页权限查看"
+        
+        # --- 2. 获取热门歌曲列表 ---
         songs_url = f"https://music.163.com/api/artist/top/song?id={artist_id}"
-        s_res = requests.get(songs_url, headers=headers, timeout=10).json()
-        songs = s_res.get('songs', [])
-
+        songs_res = requests.get(songs_url, headers=headers, timeout=10).json()
+        songs = songs_res.get('songs', [])
+        
         if not songs:
-            return None, name, fans
+            return None, "该歌手暂无热门歌曲数据。"
 
-        results = []
-        # 为了提高成功率，减少对单个接口的并发请求
-        limit = min(len(songs), 20)
-        for s in songs[:limit]:
-            sid = s['id']
-            # 红心/收藏数：在公众 API 中，它与评论数的互动量高度正相关
-            # 我们直接提取歌曲对象中的 pop 字段（热度值）作为参考，
-            # 并保留评论数作为红心数的参考。
+        final_list = []
+        progress_bar = st.progress(0, text="正在深度采集歌曲数据...")
+        
+        # 采集前 20 首以保证稳定性和红心数查询频率
+        max_scan = min(len(songs), 20)
+        
+        for i, song in enumerate(songs[:max_scan]):
+            s_id = song['id']
+            s_name = song['name']
             
-            # 获取评论数
-            comment_api = f"https://music.163.com/api/v1/resource/comments/R_SO_4_{sid}?limit=0"
+            # --- 3. 获取评论数 (红心数的最佳替代参考) ---
+            comment_api = f"https://music.163.com/api/v1/resource/comments/R_SO_4_{s_id}?limit=0"
             try:
                 c_data = requests.get(comment_api, headers=headers, timeout=5).json()
-                c_total = c_data.get('total', 0)
+                comment_total = c_data.get('total', 0)
+                # 模拟前端 999+ 显示逻辑 (如需要)
+                comment_display = f"{comment_total}" if comment_total < 10000 else f"{round(comment_total/10000, 1)}w+"
             except:
-                c_total = 0
+                comment_display = "暂无"
 
-            # 发布日期
-            pub_date = pd.to_datetime(s.get('publishTime', 0), unit='ms').strftime('%Y-%m-%d') if s.get('publishTime') else "未知"
+            # --- 4. 尝试获取歌曲发布日期 ---
+            pub_time = pd.to_datetime(song.get('publishTime', 0), unit='ms').strftime('%Y-%m-%d') if song.get('publishTime') else "未知"
 
-            results.append({
-                "歌手": name,
-                "歌曲名称": s.get('name'),
-                "参考收藏(评论数)": f"{c_total}+" if c_total > 999 else str(c_total),
-                "精确评论数": c_total,
-                "发布时间": pub_date,
-                "歌曲 ID": sid
+            final_list.append({
+                "歌手": artist_name,
+                "歌曲名称": s_name,
+                "评论总数": comment_total,
+                "热度范围": comment_display,
+                "发布日期": pub_time,
+                "歌曲链接": f"https://music.163.com/#/song?id={s_id}"
             })
+            progress_bar.progress((i + 1) / max_scan, text=f"已完成: {s_name}")
 
-        return pd.DataFrame(results), name, fans
+        df = pd.DataFrame(final_list)
+        return df, artist_name, fans_count
 
     except Exception as e:
-        return None, None, f"程序运行出错: {str(e)}"
+        return None, None, f"发生错误: {str(e)}"
 
-# --- 界面部分 ---
-inp = st.text_input("请输入歌手 ID (例如 13932773):", value="13932773")
+# --- UI 界面 ---
+url_input = st.text_input("粘贴歌手主页链接或 ID (如 13932773):")
 
-if st.button("开始采集"):
-    # 提取 ID
-    aid = re.search(r'id=(\d+)', inp).group(1) if 'id=' in inp else inp.strip()
+if st.button("开始深度采集"):
+    match = re.search(r'id=(\d+)', url_input)
+    artist_id = match.group(1) if match else url_input.strip()
     
-    with st.spinner('正在调取官方接口数据...'):
-        df, name, fans = get_data_v2(aid)
-        
-        if df is not None:
-            st.success(f"采集成功！歌手：{name}")
-            col1, col2 = st.columns(2)
-            col1.metric("歌手姓名", name)
-            col2.metric("粉丝总数", f"{fans:,}" if isinstance(fans, int) else fans)
+    if not artist_id.isdigit():
+        st.warning("请输入有效的数字 ID。")
+    else:
+        with st.spinner('正在调取网易云 API...'):
+            df, name, fans = get_full_stats(artist_id)
             
+        if name:
+            st.success(f"✅ 采集完成！")
+            
+            # 统计概览卡片
+            col_a, col_b = st.columns(2)
+            col_a.metric("当前歌手", name)
+            col_b.metric("粉丝数", fans)
+            
+            # 显示表格
             st.dataframe(df, use_container_width=True)
             
-            # 导出 Excel
-            buf = io.BytesIO()
-            with pd.ExcelWriter(buf, engine='openpyxl') as w:
-                df.to_excel(w, index=False)
-            st.download_button("📥 点击下载 Excel 报告", buf.getvalue(), f"{name}_data.xlsx")
+            # 导出
+            buffer = io.BytesIO()
+            with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+                df.to_excel(writer, index=False)
+            st.download_button("📥 下载 Excel 报告", data=buffer.getvalue(), file_name=f"{name}_data.xlsx")
         else:
-            st.error(f"无法获取数据。错误详情：{fans}")
+            st.error(fans) # 此处 fans 变量存放了错误信息
