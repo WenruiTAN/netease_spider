@@ -4,9 +4,50 @@ import requests
 import io
 import re
 
-st.set_page_config(page_title="网易云深度助手", layout="wide")
+# --- 1. 网页配置 ---
+st.set_page_config(page_title="🎵 网易云音乐数据采集工具", layout="wide", page_icon="🎵")
 
-# --- 初始化 Session State (保持不变) ---
+# --- 2. CSS 注入 (统一审美) ---
+st.markdown("""
+    <style>
+    /* 统一大标题样式 */
+    .main-title {
+        font-size: 32px !important;
+        font-weight: 800 !important;
+        color: #0D47A1;
+        text-align: center;
+        margin-bottom: 30px !important;
+    }
+    /* 统一二级标题样式 */
+    .section-header {
+        font-size: 24px !important;
+        font-weight: 700 !important;
+        color: #333333;
+        margin-top: 20px !important;
+        margin-bottom: 15px !important;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    /* 蓝色便签纸卡片 */
+    .blue-note {
+        background-color: #E3F2FD;
+        border-left: 6px solid #2196F3;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        margin-bottom: 25px;
+    }
+    .blue-note p {
+        color: #1565C0 !important;
+        margin-bottom: 8px !important;
+        font-size: 16px !important;
+        line-height: 1.6 !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# --- 3. 初始化 Session State (保持不变) ---
 if 'df_songs' not in st.session_state:
     st.session_state.df_songs = None
 if 'df_albums' not in st.session_state:
@@ -14,7 +55,7 @@ if 'df_albums' not in st.session_state:
 if 'artist_name' not in st.session_state:
     st.session_state.artist_name = ""
 
-# --- 核心采集函数 (保持不变) ---
+# --- 4. 核心采集函数 (保持不变) ---
 def get_final_data(artist_id):
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -84,29 +125,28 @@ def get_final_data(artist_id):
     except Exception as e:
         return None, None, str(e)
 
-# --- 页面 UI 调整部分 ---
+# --- 5. 界面布局 ---
 
-# 1. 标题始终居中
-st.markdown("<h1 style='text-align: center;'>🎵 网易云音乐歌手数据采集</h1>", unsafe_allow_html=True)
+st.markdown('<div class="main-title">🎵 网易云音乐数据采集工具</div>', unsafe_allow_html=True)
 
-# 2. 创建居中布局：左右 25% 留白，中间 50% 放置搜索和说明
 left_col, mid_col, right_col = st.columns([1, 2, 1])
 
 with mid_col:
-    # 判断：如果没有数据，显示说明
+    # A. 使用说明 (蓝色便签样式)
     if st.session_state.df_songs is None:
-        st.info("""
-        ### 📖 使用说明 & 功能
-        1. **如何操作**：在下方输入框粘贴**歌手主页链接**或直接输入**歌手 ID**。
-        2. **采集内容**：
-            - **歌曲清单**：获取热门歌曲信息及评论数。
-            - **专辑汇总**：获取歌手专辑详情、**真实收藏数**等。
-        3. **数据导出**：采集完成后可下载双 Sheet Excel 报表。
-        """)
+        st.markdown("""
+            <div class="blue-note">
+                <div style="font-size: 20px; font-weight: bold; color: #0D47A1; margin-bottom: 10px;">📖 使用说明 & 功能</div>
+                <p>1. <strong>如何操作</strong>：在下方输入框粘贴<b>歌手主页链接</b>或直接输入<b>歌手 ID</b>。</p>
+                <p>2. <strong>采集内容</strong>：获取热门歌曲评论数、专辑明细及真实收藏数。</p>
+                <p>3. <strong>数据导出</strong>：完成后可下载双 Sheet Excel 报表。</p>
+            </div>
+        """, unsafe_allow_html=True)
 
-    # 输入区和按钮
+    # B. 输入区 (配置中心感)
+    st.markdown('<div class="section-header">⚙️ 采集配置</div>', unsafe_allow_html=True)
     inp = st.text_input("请输入歌手 ID 或主页链接:", placeholder="例如: 13932773")
-    btn_click = st.button("🚀 开始全维度采集", use_container_width=True)
+    btn_click = st.button("🚀 开始采集", use_container_width=True)
 
     if btn_click:
         aid = re.search(r'id=(\d+)', inp).group(1) if 'id=' in inp else inp.strip()
@@ -123,10 +163,9 @@ with mid_col:
                 else:
                     st.error(f"采集出错: {name_res}")
 
-# 3. 采集完成后的结果显示（表格通常需要较宽，所以跳出 mid_col 使用全宽或稍窄布局）
+# --- 6. 结果显示 ---
 if st.session_state.df_songs is not None:
-    # 结果区域稍微宽一点，比例设为 [0.5, 9, 0.5] 几乎占据全宽但两边有呼吸感
-    _, res_col, _ = st.columns([0.1, 0.8, 0.1])
+    _, res_col, _ = st.columns([0.05, 0.9, 0.05])
     
     with res_col:
         st.success(f"✅ 歌手【{st.session_state.artist_name}】的数据采集已完成")
@@ -140,7 +179,7 @@ if st.session_state.df_songs is not None:
         st.download_button(
             label="📥 下载完整 Excel 报表", 
             data=buf.getvalue(), 
-            file_name=f"{st.session_state.artist_name}_全维度报表.xlsx",
+            file_name=f"{st.session_state.artist_name}_数据报表.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True
         )
