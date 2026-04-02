@@ -1,13 +1,36 @@
 import streamlit as st
+import pd
 import pandas as pd
 import requests
 import io
 import re
 
 st.set_page_config(page_title="网易云深度助手", layout="wide")
-st.title("🎵 网易云音乐歌手/专辑深度采集")
 
-# --- 核心逻辑：使用 Session State 存储数据防止页面刷新重置 ---
+# --- 侧边栏：功能说明 ---
+with st.sidebar:
+    st.header("🚀 功能特性")
+    st.markdown("""
+    - **全维度采集**：一键获取歌手的热门歌曲、所属专辑、发布时间。
+    - **深度指标**：包含歌曲评论数、专辑收藏数、专辑自身评论数。
+    - **精准过滤**：自动识别歌手主页专辑，排除客串与他人合辑。
+    - **无损导出**：支持双表（歌曲+专辑）整合导出为 Excel。
+    """)
+    st.divider()
+    st.info("💡 提示：若采集过程中进度条卡顿，请尝试刷新页面或检查网络。")
+
+st.title("🎵 网易云音乐歌手歌曲/专辑数据采集")
+
+# --- 页面顶部：使用说明 ---
+with st.expander("📖 如何使用本工具？", expanded=False):
+    st.markdown("""
+    1. **获取 ID**：打开网易云音乐网页版，搜索并进入歌手主页。
+    2. **提取链接**：复制浏览器地址栏的链接，或直接复制 ID（例如：`13932773`）。
+    3. **开始采集**：将链接或 ID 粘贴到下方输入框，点击“开始全维度采集”。
+    4. **查看与下载**：采集完成后，可以在下方标签页切换查看，点击下载按钮即可保存 Excel 报告。
+    """)
+
+# --- 核心逻辑：Session State ---
 if 'df_songs' not in st.session_state:
     st.session_state.df_songs = None
 if 'df_albums' not in st.session_state:
@@ -35,7 +58,6 @@ def get_final_data(artist_id):
         song_data = []
         msg_slot = st.empty()
         
-        # 采集热门歌曲
         max_s = min(len(songs), 50)
         for i in range(max_s):
             s = songs[i]
@@ -69,12 +91,10 @@ def get_final_data(artist_id):
             msg_slot.text(f"正在穿透专辑收藏数据: {alb['name']}")
             
             try:
-                # 获取真实的 subCount (收藏数)
                 dynamic_url = f"https://music.163.com/api/album/detail/dynamic?id={aid}"
                 dyn_res = requests.get(dynamic_url, headers=headers, timeout=5).json()
                 real_sub_count = dyn_res.get('subCount', 0)
                 
-                # 获取专辑评论数
                 alb_comm_url = f"https://music.163.com/api/v1/resource/comments/R_AL_3_{aid}?limit=0"
                 alb_comm_total = requests.get(alb_comm_url, headers=headers, timeout=5).json().get('total', 0)
             except:
@@ -98,38 +118,35 @@ def get_final_data(artist_id):
         return None, None, str(e)
 
 # --- UI 逻辑 ---
-inp = st.text_input("请输入歌手 ID (如 13932773):", value="13932773")
+inp = st.text_input("请输入歌手 ID 或主页链接:", placeholder="例如: 13932773")
 
 if st.button("🚀 开始全维度采集"):
-    # 提取 ID
     aid = re.search(r'id=(\d+)', inp).group(1) if 'id=' in inp else inp.strip()
     
     if not aid.isdigit():
         st.error("请输入有效的数字 ID")
     else:
-        with st.spinner('正在执行多维数据抓取...'):
+        with st.spinner('数据采集引擎启动中...'):
             df_s, df_a, name_res = get_final_data(aid)
             if df_s is not None:
-                # 将结果存入 session_state
                 st.session_state.df_songs = df_s
                 st.session_state.df_albums = df_a
                 st.session_state.artist_name = name_res
             else:
-                st.error(f"报错详情: {name_res}")
+                st.error(f"采集出错: {name_res}")
 
-# --- 显示结果逻辑 (独立于按钮点击) ---
+# --- 显示结果逻辑 ---
 if st.session_state.df_songs is not None:
-    st.success(f"完成！歌手：{st.session_state.artist_name}")
+    st.divider()
+    st.success(f"✅ 歌手【{st.session_state.artist_name}】的数据已采集完成")
     
-    # 导出整合 Excel
     buf = io.BytesIO()
     with pd.ExcelWriter(buf, engine='openpyxl') as writer:
         st.session_state.df_songs.to_excel(writer, sheet_name="歌曲详情", index=False)
         st.session_state.df_albums.to_excel(writer, sheet_name="专辑汇总", index=False)
     
-    # 下载按钮（放在数据展示上方，方便操作）
     st.download_button(
-        label="📥 点击下载完整报告 (含歌曲+专辑)", 
+        label="📥 点击下载完整 Excel 报告", 
         data=buf.getvalue(), 
         file_name=f"{st.session_state.artist_name}_全维度报表.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
