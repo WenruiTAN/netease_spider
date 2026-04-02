@@ -1,23 +1,24 @@
-import subprocess
-import sys
-
-# 补丁：手动触发 playwright 安装
-try:
-    import playwright
-except ImportError:
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "playwright"])
-    subprocess.check_call([sys.executable, "-m", "playwright", "install", "chromium"])
-
-# 原有的 import 保持不变
-import streamlit as st
-from playwright.async_api import async_playwright
-# ... 其余代码
-
 import streamlit as st
 import pandas as pd
 import asyncio
 from playwright.async_api import async_playwright
 import io
+import os
+import subprocess
+
+# --- 核心补丁：自动安装浏览器内核 ---
+def install_playwright_browsers():
+    try:
+        # 尝试运行一次，看内核在不在
+        subprocess.run(["playwright", "install", "chromium"], check=True)
+    except Exception as e:
+        st.error(f"浏览器初始化失败: {e}")
+
+# 在程序最开始就运行安装逻辑
+if 'browser_installed' not in st.session_state:
+    with st.spinner("首次运行，正在配置服务器环境（约需 30 秒）..."):
+        install_playwright_browsers()
+        st.session_state['browser_installed'] = True
 
 # 设置页面配置
 st.set_page_config(page_title="网易云音乐歌手数据采集器", layout="wide")
