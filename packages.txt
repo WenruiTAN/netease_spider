@@ -1,2 +1,0 @@
-libgbm1
-libasound2
