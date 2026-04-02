@@ -1,15 +1,19 @@
 import streamlit as st
-import os
 import subprocess
+import sys
 
-# 在程序最开始执行，确保只执行一次
-if 'browser_installed' not in st.session_state:
-    with st.spinner("正在初始化服务器环境，请稍候..."):
-        # 尝试安装 playwright 浏览器内核
-        subprocess.run(["playwright", "install", "chromium"], check=True)
-        st.session_state['browser_installed'] = True
+# 自动配置环境
+if 'env_ready' not in st.session_state:
+    with st.spinner("正在配置云端浏览器环境，请稍候..."):
+        try:
+            # 1. 安装 Chromium
+            subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"], check=True)
+            # 2. 【核心补丁】让 playwright 自动安装缺失的系统依赖
+            subprocess.run([sys.executable, "-m", "playwright", "install-deps"], check=True)
+            st.session_state['env_ready'] = True
+        except Exception as e:
+            st.error(f"环境初始化失败: {e}")
 
-# 然后才是你的其他 import
 import pandas as pd
 import asyncio
 from playwright.async_api import async_playwright
