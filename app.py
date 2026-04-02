@@ -127,7 +127,7 @@ def get_final_data(artist_id):
 
 # --- 5. 界面布局 ---
 
-st.markdown('<div class="main-title">🎵 网易云音乐数据采集工具</div>', unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center;'>🎵 网易云音乐数据采集工具</h1>", unsafe_allow_html=True)
 
 left_col, mid_col, right_col = st.columns([1, 2, 1])
 
