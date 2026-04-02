@@ -1,3 +1,18 @@
+import subprocess
+import sys
+
+# 补丁：手动触发 playwright 安装
+try:
+    import playwright
+except ImportError:
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "playwright"])
+    subprocess.check_call([sys.executable, "-m", "playwright", "install", "chromium"])
+
+# 原有的 import 保持不变
+import streamlit as st
+from playwright.async_api import async_playwright
+# ... 其余代码
+
 import streamlit as st
 import pandas as pd
 import asyncio
