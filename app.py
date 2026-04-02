@@ -5,7 +5,7 @@ import io
 import re
 
 # --- 1. 网页配置 ---
-st.set_page_config(page_title="🎵 网易云音乐数据采集工具", layout="wide", page_icon="🎵")
+st.set_page_config(page_title="网易云音乐数据采集工具", layout="wide", page_icon="🎵")
 
 # --- 2. CSS 注入 (统一审美) ---
 st.markdown("""
@@ -138,7 +138,7 @@ with mid_col:
             <div class="blue-note">
                 <div style="font-size: 20px; font-weight: bold; color: #0D47A1; margin-bottom: 10px;">📖 使用说明 & 功能</div>
                 <p>1. <strong>如何操作</strong>：在下方输入框粘贴<b>歌手主页链接</b>或直接输入<b>歌手 ID</b>。</p>
-                <p>2. <strong>采集内容</strong>：获取热门歌曲评论数、专辑明细及真实收藏数。</p>
+                <p>2. <strong>采集内容</strong>：获取热门歌曲所属专辑、发布时间、评论数，专辑明细及收藏、评论数。</p>
                 <p>3. <strong>数据导出</strong>：完成后可下载双 Sheet Excel 报表。</p>
             </div>
         """, unsafe_allow_html=True)
