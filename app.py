@@ -84,9 +84,9 @@ def get_final_data(artist_id):
             album_results.append({
                 "专辑名称": alb['name'],
                 "发布时间": pd.to_datetime(alb.get('publishTime', 0), unit='ms').strftime('%Y-%m-%d'),
+                "专辑内歌曲数": alb.get('size', 0),
                 "专辑收藏数": real_sub_count,
                 "专辑自身评论数": alb_comm_total,
-                "专辑内歌曲数": alb.get('size', 0),
                 "链接": f"https://music.163.com/#/album?id={aid}"
             })
             alb_progress.progress((i + 1) / len(hot_albums))
